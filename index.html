@@ -639,14 +639,12 @@ let dirEventRows = []; // [{num, name, heats}]
 // ═══════════════════════════════════════════════════════════
 function savePrefs() {
   try {
-    localStorage.setItem("swim_api",   apiUrl);
     localStorage.setItem("swim_lane",  myLane);
     localStorage.setItem("swim_timer", myTimer);
   } catch(e) {}
 }
 function loadPrefs() {
   try {
-    apiUrl  = localStorage.getItem("swim_api")   || "";
     myLane  = localStorage.getItem("swim_lane")  ? Number(localStorage.getItem("swim_lane"))  : null;
     myTimer = localStorage.getItem("swim_timer") ? Number(localStorage.getItem("swim_timer")) : null;
   } catch(e) {}
