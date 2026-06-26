@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Swim Timer</title>
+<style>
+  :root {
+    --navy:      #0B2545;
+    --blue:      #1B4F8A;
+    --water:     #2196C4;
+    --white:     #FFFFFF;
+    --go:        #1DB87A;
+    --stop:      #E84040;
+    --amber:     #F5A623;
+    --muted:     #6B8299;
+    --border:    #C5D8E8;
+    --radius:    14px;
+    --radius-lg: 22px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--navy);
+    color: var(--white);
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  .screen { display: none; flex-direction: column; min-height: 100dvh; }
+  .screen.active { display: flex; }
+
+  /* ─── SHARED COMPONENTS ──────────────────────────────────── */
+
+  .setup-logo {
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--water);
+    font-weight: 600;
+  }
+  .setup-title {
+    font-size: 30px;
+    font-weight: 800;
+    text-align: center;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+  }
+  .setup-title span { color: var(--water); }
+
+  .card {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .field-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--water);
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .url-field {
+    width: 100%;
+    padding: 13px 16px;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    background: rgba(255,255,255,0.06);
+    color: var(--white);
+    font-size: 14px;
+    outline: none;
+  }
+  .url-field::placeholder { color: var(--muted); }
+  .url-field:focus { border-color: var(--water); }
+
+  .btn-primary {
+    width: 100%;
+    padding: 16px;
+    border-radius: var(--radius);
+    border: none;
+    background: var(--water);
+    color: var(--white);
+    font-size: 17px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.12s, transform 0.08s;
+  }
+  .btn-primary:disabled { opacity: 0.4; cursor: default; }
+  .btn-primary:not(:disabled):active { transform: scale(0.97); background: #1a7aaa; }
+
+  .btn-ghost {
+    background: none;
+    border: 1.5px solid rgba(255,255,255,0.2);
+    border-radius: var(--radius);
+    color: var(--white);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 12px;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .btn-ghost:active { background: rgba(255,255,255,0.08); }
+
+  /* ─── SCREEN: LANDING ────────────────────────────────────── */
+  #screen-landing {
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    gap: 32px;
+    background: linear-gradient(160deg, var(--navy) 0%, var(--blue) 100%);
+  }
+
+  .landing-choices {
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .role-btn {
+    padding: 22px 24px;
+    border-radius: var(--radius-lg);
+    border: 1.5px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.06);
+    color: var(--white);
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: background 0.12s, border-color 0.12s, transform 0.08s;
+  }
+  .role-btn:active { transform: scale(0.98); }
+  .role-btn.timer-role  { border-color: rgba(33,150,196,0.4); background: rgba(33,150,196,0.1); }
+  .role-btn.director-role { border-color: rgba(245,166,35,0.4); background: rgba(245,166,35,0.08); }
+  .role-btn .role-title { font-size: 19px; font-weight: 800; }
+  .role-btn .role-sub   { font-size: 13px; color: var(--muted); }
+  .role-btn.timer-role .role-title  { color: var(--water); }
+  .role-btn.director-role .role-title { color: var(--amber); }
+
+  /* ─── SCREEN: TIMER SETUP ────────────────────────────────── */
+  #screen-setup {
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    gap: 24px;
+    background: linear-gradient(160deg, var(--navy) 0%, var(--blue) 100%);
+  }
+
+  .lane-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .lane-btn {
+    background: rgba(255,255,255,0.06);
+    border: 1.5px solid rgba(255,255,255,0.15);
+    border-radius: var(--radius);
+    color: var(--white);
+    font-size: 20px;
+    font-weight: 800;
+    padding: 18px 0;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, transform 0.08s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .lane-btn small { font-size: 10px; font-weight: 500; color: var(--muted); letter-spacing: 0.08em; }
+  .lane-btn:active { transform: scale(0.95); }
+  .lane-btn.selected { background: var(--water); border-color: var(--water); }
+
+  .timer-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .timer-btn {
+    background: rgba(255,255,255,0.06);
+    border: 1.5px solid rgba(255,255,255,0.15);
+    border-radius: var(--radius);
+    color: var(--white);
+    font-size: 16px;
+    font-weight: 700;
+    padding: 16px 0;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .timer-btn.selected { background: var(--water); border-color: var(--water); }
+
+  /* ─── SCREEN: TIMER ──────────────────────────────────────── */
+  #screen-timer { background: var(--navy); }
+
+  .timer-header {
+    background: var(--blue);
+    padding: 14px 18px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .header-event { flex: 1; min-width: 0; }
+  .header-event-num  { font-size: 11px; color: var(--water); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  .header-event-name { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .header-heat { display: flex; flex-direction: column; align-items: center; gap: 1px; flex-shrink: 0; }
+  .heat-label  { font-size: 10px; color: var(--water); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  .heat-num    { font-size: 22px; font-weight: 900; line-height: 1; }
+
+  .header-lane { background: var(--water); border-radius: 10px; padding: 6px 14px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+  .header-lane span:first-child { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.8; }
+  .header-lane span:last-child  { font-size: 20px; font-weight: 900; line-height: 1.1; }
+
+  .watch-area {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 28px 24px 20px; gap: 6px;
+  }
+  .watch-timer-badge { font-size: 11px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600; }
+  .watch-display {
+    font-size: 72px; font-weight: 900; letter-spacing: -2px; line-height: 1;
+    font-variant-numeric: tabular-nums; color: var(--white); transition: color 0.1s;
+  }
+  .watch-display.running { color: var(--go); }
+  .watch-display.stopped { color: var(--amber); }
+  .watch-ms { font-size: 32px; font-weight: 700; color: var(--muted); letter-spacing: 0; font-variant-numeric: tabular-nums; margin-top: -4px; }
+
+  .start-stop-wrap { padding: 0 24px; display: flex; justify-content: center; }
+  .start-stop-btn {
+    width: 180px; height: 180px; border-radius: 50%; border: none; cursor: pointer;
+    font-size: 26px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase;
+    transition: transform 0.1s, box-shadow 0.1s;
+    background: var(--go);
+    box-shadow: 0 0 0 6px rgba(29,184,122,0.15), 0 8px 32px rgba(0,0,0,0.35);
+    color: var(--white); display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 4px; -webkit-user-select: none; user-select: none;
+  }
+  .start-stop-btn.running {
+    background: var(--stop);
+    box-shadow: 0 0 0 6px rgba(232,64,64,0.15), 0 8px 32px rgba(0,0,0,0.35);
+  }
+  .start-stop-btn .btn-icon { font-size: 36px; line-height: 1; }
+  .start-stop-btn:active { transform: scale(0.94); }
+
+  .submit-area { padding: 20px 24px 12px; display: flex; flex-direction: column; gap: 12px; }
+  .submitted-time {
+    background: rgba(29,184,122,0.12); border: 1.5px solid rgba(29,184,122,0.3);
+    border-radius: var(--radius); padding: 14px 18px;
+    display: none; align-items: center; justify-content: space-between;
+  }
+  .submitted-time.visible { display: flex; }
+  .submitted-time .st-label { font-size: 12px; color: var(--go); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
+  .submitted-time .st-val   { font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; }
+
+  .btn-submit {
+    width: 100%; padding: 18px; border-radius: var(--radius); border: none;
+    background: var(--amber); color: var(--navy); font-size: 19px; font-weight: 900;
+    cursor: pointer; transition: background 0.12s, transform 0.08s, opacity 0.12s;
+  }
+  .btn-submit:disabled { opacity: 0.35; cursor: default; }
+  .btn-submit:not(:disabled):active { transform: scale(0.97); background: #d4921c; }
+  .btn-submit.sent { background: var(--go); color: var(--white); opacity: 1 !important; cursor: default; }
+
+  .heat-nav { padding: 8px 24px 16px; display: flex; gap: 10px; }
+  .nav-btn {
+    flex: 1; padding: 13px; border-radius: var(--radius);
+    border: 1.5px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05);
+    color: var(--white); font-size: 15px; font-weight: 700; cursor: pointer;
+    transition: background 0.12s, transform 0.08s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .nav-btn:active { transform: scale(0.96); background: rgba(255,255,255,0.1); }
+  .nav-btn.advance { background: rgba(33,150,196,0.18); border-color: rgba(33,150,196,0.4); }
+
+  .heat-summary {
+    margin: 0 24px 20px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .heat-summary-header {
+    padding: 10px 16px; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--water);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .heat-summary-header button {
+    background: none; border: none; color: var(--muted);
+    font-size: 12px; cursor: pointer; font-weight: 600; padding: 2px 6px;
+  }
+  .lane-row {
+    display: grid; grid-template-columns: 36px 1fr 1fr;
+    align-items: center; padding: 9px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 14px; gap: 8px;
+  }
+  .lane-row:last-child { border-bottom: none; }
+  .lane-row.my-lane { background: rgba(33,150,196,0.1); }
+  .lane-row .l-num { font-weight: 800; color: var(--water); }
+  .lane-row .l-t1  { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .lane-row .l-t2  { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+  .lane-row .empty { color: rgba(255,255,255,0.2); font-size: 13px; }
+
+  /* ─── SCREEN: DIRECTOR ───────────────────────────────────── */
+  #screen-director {
+    background: var(--navy);
+    padding-bottom: 40px;
+  }
+
+  .dir-header {
+    background: var(--blue);
+    padding: 16px 18px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .dir-header-title { font-size: 17px; font-weight: 800; }
+  .dir-header-sub   { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .dir-url-row {
+    padding: 16px 18px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* Event entry table */
+  .event-table-wrap {
+    padding: 16px 18px 0;
+    overflow-x: auto;
+  }
+
+  .event-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  .event-table th {
+    text-align: left;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--water);
+    font-weight: 700;
+    padding: 0 8px 10px;
+  }
+  .event-table td {
+    padding: 4px 4px;
+    vertical-align: middle;
+  }
+  .event-table td:first-child { width: 44px; padding-left: 8px; }
+  .event-table td:last-child  { width: 44px; padding-right: 8px; text-align: center; }
+
+  .tbl-num {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tbl-input {
+    width: 100%;
+    background: rgba(255,255,255,0.06);
+    border: 1.5px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    color: var(--white);
+    font-size: 14px;
+    padding: 9px 10px;
+    outline: none;
+    transition: border-color 0.12s;
+  }
+  .tbl-input:focus { border-color: var(--water); }
+  .tbl-input.heats-input { width: 56px; text-align: center; }
+
+  .row-del-btn {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.25);
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition: color 0.12s, background 0.12s;
+  }
+  .row-del-btn:active { color: var(--stop); background: rgba(232,64,64,0.1); }
+
+  .dir-actions {
+    padding: 14px 18px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .btn-add-row {
+    background: rgba(255,255,255,0.05);
+    border: 1.5px dashed rgba(255,255,255,0.2);
+    border-radius: var(--radius);
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 13px;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.12s, color 0.12s;
+  }
+  .btn-add-row:active { background: rgba(255,255,255,0.09); color: var(--white); }
+
+  .btn-save {
+    width: 100%;
+    padding: 17px;
+    border-radius: var(--radius);
+    border: none;
+    background: var(--go);
+    color: var(--white);
+    font-size: 18px;
+    font-weight: 900;
+    cursor: pointer;
+    transition: background 0.12s, transform 0.08s, opacity 0.12s;
+  }
+  .btn-save:disabled { opacity: 0.4; cursor: default; }
+  .btn-save:not(:disabled):active { transform: scale(0.97); background: #158A5A; }
+
+  .dir-tip {
+    margin: 12px 18px 0;
+    padding: 12px 14px;
+    background: rgba(33,150,196,0.08);
+    border: 1px solid rgba(33,150,196,0.2);
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .dir-tip strong { color: var(--water); font-weight: 700; }
+
+  /* ─── STATUS BAR ─────────────────────────────────────────── */
+  .status-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    padding: 12px 20px; font-size: 14px; font-weight: 600; text-align: center;
+    transform: translateY(100%); transition: transform 0.25s; z-index: 100;
+  }
+  .status-bar.visible { transform: translateY(0); }
+  .status-bar.ok  { background: var(--go);  color: var(--white); }
+  .status-bar.err { background: var(--stop); color: var(--white); }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN: LANDING — choose role
+═══════════════════════════════════════════════════════════ -->
+<div id="screen-landing" class="screen active">
+  <div class="setup-logo">Swim League Timing</div>
+  <div class="setup-title">Who are<br><span>you today?</span></div>
+  <div class="landing-choices">
+    <button class="role-btn timer-role" onclick="showScreen('setup')">
+      <span class="role-title">⏱ Timer</span>
+      <span class="role-sub">Start, stop, and submit times for your lane</span>
+    </button>
+    <button class="role-btn director-role" onclick="showScreen('director')">
+      <span class="role-title">📋 Meet Director</span>
+      <span class="role-sub">Enter the event list before the meet starts</span>
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN: TIMER SETUP — pick lane & timer number
+═══════════════════════════════════════════════════════════ -->
+<div id="screen-setup" class="screen">
+  <div style="align-items:center;justify-content:center;display:flex;flex-direction:column;flex:1;gap:24px;padding:32px 24px;background:linear-gradient(160deg,var(--navy) 0%,var(--blue) 100%)">
+    <div class="setup-logo">Swim League Timing</div>
+    <div class="setup-title">Ready to<br><span>Time.</span></div>
+
+    <div class="card">
+      <div>
+        <div class="field-label">Your Lane</div>
+        <div class="lane-grid">
+          <button class="lane-btn" data-lane="1" onclick="selectLane(1)">1<small>Lane</small></button>
+          <button class="lane-btn" data-lane="2" onclick="selectLane(2)">2<small>Lane</small></button>
+          <button class="lane-btn" data-lane="3" onclick="selectLane(3)">3<small>Lane</small></button>
+          <button class="lane-btn" data-lane="4" onclick="selectLane(4)">4<small>Lane</small></button>
+          <button class="lane-btn" data-lane="5" onclick="selectLane(5)">5<small>Lane</small></button>
+          <button class="lane-btn" data-lane="6" onclick="selectLane(6)">6<small>Lane</small></button>
+        </div>
+      </div>
+
+      <div>
+        <div class="field-label">You Are Timer…</div>
+        <div class="timer-grid">
+          <button class="timer-btn" data-t="1" onclick="selectTimer(1)">Timer 1<br><small style="font-size:11px;font-weight:500;color:var(--muted)">Primary</small></button>
+          <button class="timer-btn" data-t="2" onclick="selectTimer(2)">Timer 2<br><small style="font-size:11px;font-weight:500;color:var(--muted)">Backup</small></button>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="start-btn" onclick="goToTimer()" disabled>Go to Timer →</button>
+      <button class="btn-ghost" onclick="showScreen('landing')" style="margin-top:-8px">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN: TIMER — stopwatch + submit
+═══════════════════════════════════════════════════════════ -->
+<div id="screen-timer" class="screen">
+
+  <div class="timer-header">
+    <div class="header-event">
+      <div class="header-event-num" id="hdr-event-num">Event —</div>
+      <div class="header-event-name" id="hdr-event-name">Loading…</div>
+    </div>
+    <div class="header-heat">
+      <span class="heat-label">Heat</span>
+      <span class="heat-num" id="hdr-heat-num">—</span>
+    </div>
+    <div class="header-lane">
+      <span>Lane</span>
+      <span id="hdr-lane-num">—</span>
+    </div>
+  </div>
+
+  <div class="watch-area">
+    <div class="watch-timer-badge" id="watch-timer-label">TIMER 1 · PRIMARY</div>
+    <div class="watch-display" id="watch-display">0:00</div>
+    <div class="watch-ms" id="watch-ms">.00</div>
+  </div>
+
+  <div class="start-stop-wrap">
+    <button class="start-stop-btn" id="start-stop-btn" onclick="toggleTimer()">
+      <span class="btn-icon">▶</span>
+      <span>START</span>
+    </button>
+  </div>
+
+  <div class="submit-area">
+    <div class="submitted-time" id="submitted-time">
+      <span class="st-label">⏱ Stopped at</span>
+      <span class="st-val" id="submitted-time-val">—</span>
+    </div>
+    <button class="btn-submit" id="submit-btn" onclick="submitTime()" disabled>
+      Submit Time
+    </button>
+  </div>
+
+  <div class="heat-nav">
+    <button class="nav-btn" onclick="changeHeat('prev')">← Prev Heat</button>
+    <button class="nav-btn advance" onclick="changeHeat('next')">Next Heat →</button>
+  </div>
+
+  <div class="heat-summary">
+    <div class="heat-summary-header">
+      All Lanes This Heat
+      <button onclick="refreshSummary()">↻ Refresh</button>
+    </div>
+    <div id="summary-rows"></div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN: DIRECTOR — enter event list
+═══════════════════════════════════════════════════════════ -->
+<div id="screen-director" class="screen">
+
+  <div class="dir-header">
+    <div>
+      <div class="dir-header-title">📋 Meet Setup</div>
+      <div class="dir-header-sub">Enter events from your heat sheet</div>
+    </div>
+    <button class="btn-ghost" onclick="showScreen('landing')" style="padding:8px 14px;font-size:13px;">← Back</button>
+  </div>
+
+  <div class="dir-tip">
+    <strong>How to use:</strong> Open your Meet Maestro heat sheet, then fill in each event name and number of heats below. Event # auto-increments — just fix any that are wrong. Hit <strong>Save to Sheet</strong> when done.
+  </div>
+
+  <div class="event-table-wrap">
+    <table class="event-table" id="event-table">
+      <thead>
+        <tr>
+          <th>Ev #</th>
+          <th>Event Name</th>
+          <th style="width:64px;text-align:center">Heats</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="event-tbody">
+        <!-- rows injected by JS -->
+      </tbody>
+    </table>
+  </div>
+
+  <div class="dir-actions">
+    <button class="btn-add-row" onclick="addEventRow()">+ Add Event</button>
+    <button class="btn-save" id="dir-save-btn" onclick="saveEvents()">Save to Sheet</button>
+    <button class="btn-ghost" onclick="confirmClearEvents()" style="font-size:13px;color:var(--muted)">Clear all rows</button>
+  </div>
+
+</div>
+
+<!-- Status bar -->
+<div class="status-bar" id="status-bar"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let apiUrl   = "";
+let myLane   = null;
+let myTimer  = null;
+
+let running  = false;
+let startTs  = null;
+let elapsed  = 0;
+let rafId    = null;
+
+let currentEvent = null;
+let currentHeat  = null;
+let eventName    = "";
+let submitted    = false;
+
+let dirEventRows = []; // [{num, name, heats}]
+
+// ═══════════════════════════════════════════════════════════
+// PERSISTENCE
+// ═══════════════════════════════════════════════════════════
+function savePrefs() {
+  try {
+    localStorage.setItem("swim_api",   apiUrl);
+    localStorage.setItem("swim_lane",  myLane);
+    localStorage.setItem("swim_timer", myTimer);
+  } catch(e) {}
+}
+function loadPrefs() {
+  try {
+    apiUrl  = localStorage.getItem("swim_api")   || "";
+    myLane  = localStorage.getItem("swim_lane")  ? Number(localStorage.getItem("swim_lane"))  : null;
+    myTimer = localStorage.getItem("swim_timer") ? Number(localStorage.getItem("swim_timer")) : null;
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════
+// SCREEN NAVIGATION
+// ═══════════════════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById("screen-" + id).classList.add("active");
+  window.scrollTo(0, 0);
+}
+
+// ═══════════════════════════════════════════════════════════
+// TIMER SETUP
+// ═══════════════════════════════════════════════════════════
+function selectLane(n) {
+  myLane = n;
+  document.querySelectorAll(".lane-btn").forEach(b => b.classList.toggle("selected", Number(b.dataset.lane) === n));
+  checkSetupReady();
+}
+function selectTimer(n) {
+  myTimer = n;
+  document.querySelectorAll(".timer-btn").forEach(b => b.classList.toggle("selected", Number(b.dataset.t) === n));
+  checkSetupReady();
+}
+function checkSetupReady() {
+  document.getElementById("start-btn").disabled = !(myLane && myTimer);
+}
+
+async function goToTimer() {
+  savePrefs();
+  showScreen("timer");
+  document.getElementById("hdr-lane-num").textContent = myLane;
+  document.getElementById("watch-timer-label").textContent =
+    "TIMER " + myTimer + " · " + (myTimer === 1 ? "PRIMARY" : "BACKUP");
+  await fetchState();
+  autoRefreshSummary();
+}
+
+// ═══════════════════════════════════════════════════════════
+// API
+// ═══════════════════════════════════════════════════════════
+async function api(params) {
+  const url  = new URL(apiUrl);
+  Object.keys(params).forEach(k => url.searchParams.set(k, params[k]));
+  const res  = await fetch(url.toString());
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+// ═══════════════════════════════════════════════════════════
+// TIMER SCREEN — state & actions
+// ═══════════════════════════════════════════════════════════
+async function fetchState() {
+  try {
+    const state = await api({ action: "getState" });
+    currentEvent = state.current_event;
+    currentHeat  = state.current_heat;
+    eventName    = state.event_name;
+    updateHeader();
+    resetWatch();
+    await refreshSummary();
+  } catch(e) {
+    showStatus("Could not reach server: " + e.message, "err");
+  }
+}
+
+async function changeHeat(dir) {
+  try {
+    const state = await api({ action: "setHeat", direction: dir });
+    currentEvent = state.current_event;
+    currentHeat  = state.current_heat;
+    eventName    = state.event_name;
+    updateHeader();
+    resetWatch();
+    await refreshSummary();
+    showStatus(dir === "next" ? "Advanced →" : "← Went back", "ok");
+  } catch(e) {
+    showStatus("Error: " + e.message, "err");
+  }
+}
+
+async function submitTime() {
+  if (!elapsed) return;
+  const display = formatTime(elapsed);
+  try {
+    document.getElementById("submit-btn").textContent = "Sending…";
+    await api({
+      action:  "submitTime",
+      event:   currentEvent,
+      heat:    currentHeat,
+      lane:    myLane,
+      timer:   myTimer,
+      ms:      elapsed,
+      display: display
+    });
+    submitted = true;
+    const btn = document.getElementById("submit-btn");
+    btn.textContent = "✓ Submitted";
+    btn.classList.add("sent");
+    btn.disabled = true;
+    showStatus("Time submitted: " + display, "ok");
+    await refreshSummary();
+  } catch(e) {
+    document.getElementById("submit-btn").textContent = "Submit Time";
+    showStatus("Submit failed: " + e.message, "err");
+  }
+}
+
+async function refreshSummary() {
+  if (!currentEvent || !currentHeat) return;
+  try {
+    const data = await api({ action: "getHeatTimes", event: currentEvent, heat: currentHeat });
+    renderSummary(data.lanes);
+  } catch(e) { /* silent */ }
+}
+
+let summaryInterval = null;
+function autoRefreshSummary() {
+  if (summaryInterval) clearInterval(summaryInterval);
+  summaryInterval = setInterval(refreshSummary, 10000);
+}
+
+function renderSummary(lanes) {
+  let html = "";
+  for (let l = 1; l <= 6; l++) {
+    const isMine = l === myLane;
+    const t1 = lanes[l]?.t1?.display;
+    const t2 = lanes[l]?.t2?.display;
+    html += `<div class="lane-row${isMine ? " my-lane" : ""}">
+      <span class="l-num">L${l}</span>
+      <span class="l-t1">${t1 ? "⏱ " + t1 : '<span class="empty">—</span>'}</span>
+      <span class="l-t2">${t2 ? t2 : '<span class="empty">—</span>'}</span>
+    </div>`;
+  }
+  document.getElementById("summary-rows").innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════
+// STOPWATCH
+// ═══════════════════════════════════════════════════════════
+function toggleTimer() {
+  if (!running) startTimer(); else stopTimer();
+}
+
+function startTimer() {
+  running   = true;
+  submitted = false;
+  startTs   = performance.now() - elapsed;
+
+  const btn = document.getElementById("start-stop-btn");
+  btn.classList.add("running");
+  btn.innerHTML = '<span class="btn-icon">■</span><span>STOP</span>';
+  document.getElementById("watch-display").classList.add("running");
+  document.getElementById("watch-display").classList.remove("stopped");
+  document.getElementById("submit-btn").disabled = true;
+  document.getElementById("submitted-time").classList.remove("visible");
+  document.getElementById("submit-btn").textContent = "Submit Time";
+  document.getElementById("submit-btn").classList.remove("sent");
+
+  function tick() {
+    if (!running) return;
+    elapsed = performance.now() - startTs;
+    renderWatch(elapsed);
+    rafId = requestAnimationFrame(tick);
+  }
+  rafId = requestAnimationFrame(tick);
+}
+
+function stopTimer() {
+  running = false;
+  if (rafId) cancelAnimationFrame(rafId);
+  elapsed = performance.now() - startTs;
+  renderWatch(elapsed);
+
+  const btn = document.getElementById("start-stop-btn");
+  btn.classList.remove("running");
+  btn.innerHTML = '<span class="btn-icon">▶</span><span>START</span>';
+  document.getElementById("watch-display").classList.remove("running");
+  document.getElementById("watch-display").classList.add("stopped");
+  document.getElementById("submitted-time").classList.add("visible");
+  document.getElementById("submitted-time-val").textContent = formatTime(elapsed);
+  document.getElementById("submit-btn").disabled = false;
+}
+
+function resetWatch() {
+  running = false; elapsed = 0; submitted = false;
+  if (rafId) cancelAnimationFrame(rafId);
+  renderWatch(0);
+  const btn = document.getElementById("start-stop-btn");
+  btn.classList.remove("running");
+  btn.innerHTML = '<span class="btn-icon">▶</span><span>START</span>';
+  document.getElementById("watch-display").classList.remove("running","stopped");
+  document.getElementById("submitted-time").classList.remove("visible");
+  document.getElementById("submit-btn").disabled = true;
+  document.getElementById("submit-btn").textContent = "Submit Time";
+  document.getElementById("submit-btn").classList.remove("sent");
+}
+
+function renderWatch(ms) {
+  const { main, centis } = splitTime(ms);
+  document.getElementById("watch-display").textContent = main;
+  document.getElementById("watch-ms").textContent = "." + centis;
+}
+function splitTime(ms) {
+  const totalSec = Math.floor(ms / 10) / 100;
+  const mins  = Math.floor(totalSec / 60);
+  const secs  = Math.floor(totalSec % 60);
+  const cs    = Math.floor((ms / 10) % 100);
+  return { main: mins + ":" + String(secs).padStart(2,"0"), centis: String(cs).padStart(2,"0") };
+}
+function formatTime(ms) {
+  const { main, centis } = splitTime(ms);
+  return main + "." + centis;
+}
+
+function updateHeader() {
+  document.getElementById("hdr-event-num").textContent  = "Event " + currentEvent;
+  document.getElementById("hdr-event-name").textContent = eventName;
+  document.getElementById("hdr-heat-num").textContent   = currentHeat;
+}
+
+// ═══════════════════════════════════════════════════════════
+// DIRECTOR — event table
+// ═══════════════════════════════════════════════════════════
+function addEventRow(name, heats) {
+  // Auto-number: next after the highest existing event number
+  const rows   = [...document.querySelectorAll("#event-tbody tr")];
+  const lastNum = rows.length > 0
+    ? Math.max(...rows.map(r => parseInt(r.querySelector(".ev-num-input")?.value || 0, 10) || 0))
+    : 0;
+  const nextNum = lastNum + 1;
+
+  const tbody = document.getElementById("event-tbody");
+  const tr    = document.createElement("tr");
+  tr.dataset.id = nextNum;
+
+  tr.innerHTML = `
+    <td><span class="tbl-num ev-num-display">${nextNum}</span>
+        <input class="tbl-input ev-num-input" type="number" min="1" value="${nextNum}"
+               style="width:44px;display:none;padding:6px 4px;text-align:center"
+               onchange="renumberRows()"
+               onfocus="this.previousElementSibling.style.display='none';this.style.display='block'"
+               onblur="this.style.display='none';this.previousElementSibling.style.display='block';this.previousElementSibling.textContent=this.value"></td>
+    <td><input class="tbl-input" type="text" placeholder="e.g. 8U 25 Free Girls" value="${name || ""}" style="width:100%"></td>
+    <td><input class="tbl-input heats-input" type="number" min="1" max="20" placeholder="2" value="${heats || ""}"></td>
+    <td><button class="row-del-btn" onclick="deleteRow(this)" title="Remove">×</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function deleteRow(btn) {
+  btn.closest("tr").remove();
+}
+
+function confirmClearEvents() {
+  if (document.querySelectorAll("#event-tbody tr").length === 0) return;
+  if (confirm("Clear all event rows?")) {
+    document.getElementById("event-tbody").innerHTML = "";
+  }
+}
+
+function renumberRows() {
+  // Keep display spans in sync — they self-update via onblur, this is a no-op hook
+}
+
+function collectRows() {
+  return [...document.querySelectorAll("#event-tbody tr")].map(tr => {
+    const inputs = tr.querySelectorAll("input");
+    return {
+      num:   parseInt(inputs[0].value, 10) || 0,
+      name:  inputs[1].value.trim(),
+      heats: parseInt(inputs[2].value, 10) || 1
+    };
+  }).filter(r => r.name);
+}
+
+async function saveEvents() {
+  const rows = collectRows();
+  if (rows.length === 0) { showStatus("Add at least one event first", "err"); return; }
+
+  const btn = document.getElementById("dir-save-btn");
+  btn.textContent = "Saving…";
+  btn.disabled    = true;
+
+  try {
+    const result = await api(
+      { action: "saveEvents", events: JSON.stringify(rows) }
+    );
+    showStatus("✓ Saved " + result.count + " events to sheet", "ok");
+    btn.textContent = "✓ Saved!";
+    setTimeout(() => { btn.textContent = "Save to Sheet"; btn.disabled = false; }, 2500);
+  } catch(e) {
+    showStatus("Save failed: " + e.message, "err");
+    btn.textContent = "Save to Sheet";
+    btn.disabled    = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// STATUS BAR
+// ═══════════════════════════════════════════════════════════
+let statusTimeout;
+function showStatus(msg, type) {
+  const bar = document.getElementById("status-bar");
+  bar.textContent = msg;
+  bar.className   = "status-bar visible " + type;
+  clearTimeout(statusTimeout);
+  statusTimeout = setTimeout(() => bar.classList.remove("visible"), 3500);
+}
+
+// ═══════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════
+(function init() {
+  apiUrl = "https://script.google.com/macros/s/AKfycbyqjZlrX9QEcYi0xI5dgHzWoLyB2MrtrP288Mb-IXXFUZ7mDERB620RV-n9R0tILhY/exec";
+  loadPrefs();
+  if (myLane)  selectLane(myLane);
+  if (myTimer) selectTimer(myTimer);
+  checkSetupReady();
+
+  // Start director with a few blank rows to invite entry
+  addEventRow(); addEventRow(); addEventRow();
+})();
+</script>
+</body>
+</html>
